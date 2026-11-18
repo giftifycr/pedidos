@@ -102,6 +102,12 @@ select.in{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
 .free{color:var(--ok);font-weight:800}
 .sw{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:var(--muted);margin-top:4px}
 .sw input{width:22px;height:22px;accent-color:#4fb3f3}
+.order.soon{box-shadow:0 0 0 2px #f2a93b, var(--sh)}
+.order.late{box-shadow:0 0 0 2px #e5566b, var(--sh);background:#fff8f8}
+.due{font-size:13.5px;font-weight:800;margin-top:6px;line-height:1.35}
+.due.ok{color:var(--ok)}.due.soon{color:#b07616}.due.late{color:var(--bad)}
+.banner.late{background:#fdecef;border-color:#f5b4bd;color:#8a2436}
+#fApBox{display:none;margin-top:10px}
 .nav{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;justify-content:space-around;align-items:flex-end;padding:6px 6px calc(8px + var(--safe-b))}
 .nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11.5px;font-weight:800;color:#93aec3;padding:4px 0}
 .nav button .i{font-size:23px;line-height:1.1;filter:grayscale(1);opacity:.7}
@@ -173,7 +179,12 @@ select.in{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
     <div class="stat"><div class="l">Este mes</div><div class="v" id="sMonth">₡0</div><div class="s" id="sMonthN">0 pedidos</div></div>
     <div class="stat"><div class="l">Por cobrar 💳</div><div class="v" id="sDue">₡0</div><div class="s" id="sDueN">0 pedidos nuevos</div></div>
     <div class="stat"><div class="l">Por enviar 📦</div><div class="v" id="sShip">0</div><div class="s">pagados o empacados</div></div>
+    <div class="stat"><div class="l">Apartados ⏳</div><div class="v" id="sAp">0</div><div class="s" id="sApN">activos</div></div>
+    <div class="stat"><div class="l">Saldo apartados</div><div class="v" id="sApDue">₡0</div><div class="s" id="sApDueN">por cobrar</div></div>
   </div>
+  <h2>Apartados activos</h2>
+  <div id="apAlert"></div>
+  <div id="apList"></div>
   <h2>Pedidos por estado</h2>
   <div class="sts" id="stsGrid"></div>
   <h2>Pendientes de enviar</h2>
@@ -220,6 +231,19 @@ select.in{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
   </div>
 
   <div class="card">
+    <label class="sw" style="margin-top:0"><input type="checkbox" id="fApartado"> Este pedido es un apartado</label>
+    <div class="hint">Se reserva con el 20% del valor del producto y queda apartado 15 días.</div>
+    <div id="fApBox">
+      <div class="sumrow"><span>Adelanto sugerido (20%)</span><b id="fApSug">₡0</b></div>
+      <label class="lb">Fecha del adelanto</label>
+      <input class="in" id="fAdelFecha" type="date">
+      <label class="lb">Monto del adelanto (₡)</label>
+      <input class="in" id="fAdelMonto" inputmode="numeric" placeholder="0">
+      <div class="hint" id="fApVence"></div>
+    </div>
+  </div>
+
+  <div class="card">
     <label class="lb" style="margin-top:0">Método de pago</label>
     <div class="seg" id="fPay"><button data-v="SINPE" class="on">📱 SINPE Móvil</button><button data-v="Transferencia">🏦 Transferencia</button></div>
     <label class="lb">Entrega</label>
@@ -246,7 +270,7 @@ select.in{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
 <section class="view" id="v-stock">
   <div class="card" style="padding:14px 16px">
     <b>Vendidos y disponibles</b>
-    <div class="hint">Se descuentan los pedidos pagados en adelante. Los pedidos "Nuevo" cuentan como apartados. Los cancelados no cuentan.</div>
+    <div class="hint">Se descuentan los pedidos pagados en adelante. Los pedidos nuevos y los apartados reservan unidades. Los cancelados no cuentan.</div>
   </div>
   <input class="search" id="sq" type="search" placeholder="Buscar producto" autocomplete="off">
   <div class="card" id="stockList"></div>
@@ -279,7 +303,7 @@ select.in{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.or
     <div class="kv"><span>Rastreo</span><b>correos.go.cr/rastreo</b></div>
   </div>
   <button class="btn bad full" id="wipeBtn">Borrar todos los pedidos</button>
-  <p class="hint" style="text-align:center;margin-top:14px">Giftify Pedidos v1.0</p>
+  <p class="hint" style="text-align:center;margin-top:14px">Giftify Pedidos v1.1</p>
 </section>
 </main>
 
@@ -303,7 +327,8 @@ const STATES = ["Nuevo","Pagado","Empacado","Enviado","Entregado"];
 const ST = {
   Nuevo:{c:"#4fb3f3",bg:"#e3f3fe",ic:"🆕"}, Pagado:{c:"#16a07a",bg:"#dff7ee",ic:"💳"},
   Empacado:{c:"#d48a12",bg:"#fff1d9",ic:"🎁"}, Enviado:{c:"#7a5cf0",bg:"#ece7ff",ic:"🚚"},
-  Entregado:{c:"#2f8a3a",bg:"#e3f5e5",ic:"✅"}, Cancelado:{c:"#e5566b",bg:"#fdecef",ic:"✖️"}
+  Entregado:{c:"#2f8a3a",bg:"#e3f5e5",ic:"✅"}, Cancelado:{c:"#e5566b",bg:"#fdecef",ic:"✖️"},
+  Apartado:{c:"#c47a12",bg:"#fff1d9",ic:"⏳"}
 };
 const SOLD_STATES = ["Pagado","Empacado","Enviado","Entregado"];
 const K = {orders:"giftify.orders.v1", prods:"giftify.products.v1", meta:"giftify.meta.v1"};
@@ -338,6 +363,52 @@ function calc(o){
   const disc = +o.desc||0;
   return {sub, ship, disc, total: Math.max(0, sub+ship-disc)};
 }
+const AP_DIAS = 15;
+function round100up(n){ return Math.ceil(Math.max(0,+n||0)/100)*100; }
+function productValue(o){ const c=calc(o); return Math.max(0, c.sub-c.disc); }
+function adelantoSugerido(o){ return round100up(productValue(o)*0.2); }
+function pagosOf(o){ return (o && Array.isArray(o.pagos)) ? o.pagos : []; }
+function pagadoTotal(o){ return pagosOf(o).reduce((a,p)=>a+(+p.monto||0),0); }
+function saldo(o){ return Math.max(0, calc(o).total-pagadoTotal(o)); }
+function isPaidFull(o){ return calc(o).total>0 && pagadoTotal(o)>=calc(o).total; }
+function isApartado(o){ return !!o && (o.estado==="Apartado" || (!!o.apartado && o.estado==="Nuevo")); }
+function addDays(fecha, n){
+  if(!fecha) return "";
+  const [y,m,d]=fecha.split("-").map(Number); const dt=new Date(y,m-1,d); dt.setDate(dt.getDate()+(+n||0));
+  return dt.getFullYear()+"-"+pad(dt.getMonth()+1)+"-"+pad(dt.getDate());
+}
+function firstPagoFecha(o){
+  const ps=pagosOf(o).slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")||((a.ts||0)-(b.ts||0)));
+  return (ps[0]&&ps[0].fecha)||"";
+}
+function venceFecha(o){ const f=firstPagoFecha(o); return f?addDays(f, AP_DIAS):""; }
+function daysLeft(o){
+  const v=venceFecha(o); if(!v) return null;
+  const [y,m,d]=v.split("-").map(Number);
+  const due=new Date(y,m-1,d), now=new Date(), t=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  return Math.round((due-t)/864e5);
+}
+function venceLabel(o){
+  const d=daysLeft(o), v=venceFecha(o);
+  if(!v) return {txt:"Todavía no hay adelanto registrado", cls:""};
+  if(d<0){ const n=Math.abs(d); return {txt:"Venció el "+fmtDate(v)+" ("+n+" día"+(n===1?"":"s")+" atrasado)", cls:"late"}; }
+  if(d===0) return {txt:"Vence hoy, "+fmtDate(v), cls:"soon"};
+  if(d<=3) return {txt:"Vence en "+d+" día"+(d===1?"":"s")+" ("+fmtDate(v)+")", cls:"soon"};
+  return {txt:"Vence el "+fmtDate(v)+" (quedan "+d+" días)", cls:"ok"};
+}
+function payText(o){
+  if(o && o.pago==="Transferencia") return `🏦 Podés pagar por transferencia bancaria:
+${SHOP.banco} · Cuenta ${SHOP.cuenta}
+IBAN: *${SHOP.iban}*
+A nombre de: ${SHOP.titular}
+
+O por SINPE Móvil al *${SHOP.sinpe}*.`;
+  return `💳 Podés pagar por SINPE Móvil al *${SHOP.sinpe}*.
+
+O por transferencia ${SHOP.banco}:
+IBAN: *${SHOP.iban}*
+A nombre de: ${SHOP.titular}`;
+}
 function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("on"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2200); }
 function pill(s){ const x=ST[s]||ST.Nuevo; return `<span class="pill" style="background:${x.bg};color:${x.c}">${x.ic} ${s}</span>`; }
 
@@ -363,7 +434,37 @@ const MSG = {
   enviado(o){ const n=firstName(o.cliente); let t=`¡Hola${n?" "+n:""}! 🚚 Tu pedido #${o.num} ya va en camino por Correos de Costa Rica.\n\n`;
     t += o.guia ? `📦 Número de guía: *${o.guia}*\n🔎 Rastrealo aquí: ${SHOP.track}\n\n` : `🔎 Podés rastrearlo aquí: ${SHOP.track}\n\n`;
     return t + `¡Ojalá lo disfruten muchísimo! ✨`; },
-  entregado(o){ const n=firstName(o.cliente); return `¡Hola${n?" "+n:""}! 🎉 ¿Ya te llegó tu pedido? ¡Gracias por comprar en Giftify! 💙\n\nSi te gustó, nos ayudaría muchísimo una fotito o video con el juguete 📸 o una reseña cortita. Si nos etiquetás en Instagram ${SHOP.ig}, ¡lo compartimos! ✨`; }
+  entregado(o){ const n=firstName(o.cliente); return `¡Hola${n?" "+n:""}! 🎉 ¿Ya te llegó tu pedido? ¡Gracias por comprar en Giftify! 💙\n\nSi te gustó, nos ayudaría muchísimo una fotito o video con el juguete 📸 o una reseña cortita. Si nos etiquetás en Instagram ${SHOP.ig}, ¡lo compartimos! ✨`; },
+  como(o){
+    const n=firstName(o.cliente), c=calc(o), sug=adelantoSugerido(o);
+    let t=`¡Hola${n?" "+n:""}! 😊 En Giftify podés apartar tu juguete con un adelanto del 20% del valor del producto.\n\n*Pedido #${o.num}*\n${itemsText(o)}\n\n*Total: ${money(c.total)}*\nAdelanto (20%): *${money(sug)}*\n`;
+    if(c.total>sug) t += `Saldo: ${money(c.total-sug)}\n`;
+    t += `\nCon el adelanto te lo reservamos 15 días. El saldo lo podés ir cancelando con abonos en ese plazo.\n\n${payText(o)}\n\nCuando hagas el adelanto, mandame el comprobante por aquí y lo dejamos apartado 💙`;
+    return t;
+  },
+  apartado(o){
+    const n=firstName(o.cliente), c=calc(o), pag=pagadoTotal(o), sal=saldo(o), v=venceFecha(o);
+    let t=`¡Hola${n?" "+n:""}! 😊 Gracias por tu apartado en Giftify 🎁\n\n*Pedido #${o.num}*\n${itemsText(o)}\n\n*Total: ${money(c.total)}*\n`;
+    t += pag>0 ? `Adelanto recibido: *${money(pag)}*\n` : `Adelanto (20%): *${money(adelantoSugerido(o))}*\n`;
+    t += `Saldo pendiente: *${money(pag>0?sal:Math.max(0,c.total-adelantoSugerido(o)))}*\n`;
+    t += v ? `\n📅 Tu apartado queda reservado hasta el *${fmtDate(v)}* (15 días).\n\n` : `\n📅 Con el adelanto te lo reservamos 15 días.\n\n`;
+    t += payText(o)+`\nCuando hagas un abono, mandame el comprobante por aquí 💙`;
+    return t;
+  },
+  recordatorio(o){
+    const n=firstName(o.cliente), c=calc(o), pag=pagadoTotal(o), sal=saldo(o), v=venceFecha(o), d=daysLeft(o);
+    let t=`¡Hola${n?" "+n:""}! 😊 Te escribo para recordarte tu apartado en Giftify 🎁\n\n*Pedido #${o.num}*\n${itemsText(o)}\n\n*Total: ${money(c.total)}*\nYa pagado: ${money(pag)}\n*Saldo pendiente: ${money(sal)}*\n`;
+    if(d==null) t += `\n📅 Apenas se registre el adelanto, queda reservado 15 días.\n\n`;
+    else if(d<0) t += `\n📅 El plazo del apartado venció el *${fmtDate(v)}*. Si todavía lo querés, escribime y lo revisamos 💙\n\n`;
+    else if(d===0) t += `\n📅 *El apartado vence hoy*, ${fmtDate(v)}.\n\n`;
+    else t += `\n📅 Te quedan *${d} día${d===1?"":"s"}* (vence el ${fmtDate(v)}).\n\n`;
+    t += payText(o)+`\nCuando hagas el abono, mandame el comprobante por aquí 💙`;
+    return t;
+  },
+  completado(o){
+    const n=firstName(o.cliente);
+    return `¡Hola${n?" "+n:""}! ✅ Ya quedó pagado por completo tu apartado en Giftify. ¡Muchas gracias! 💙\n\nYa estamos preparando tu pedido #${o.num} con mucho cariño 🎁 Te aviso apenas salga por Correos 📦`;
+  }
 };
 const WA_OPTS = [
   {k:"resumen", t:"Resumen y datos de pago", s:"Productos, total y SINPE", for:"Nuevo"},
@@ -371,6 +472,39 @@ const WA_OPTS = [
   {k:"enviado", t:"Pedido enviado", s:"Con número de guía y rastreo", for:"Enviado"},
   {k:"entregado", t:"Gracias + reseña", s:"Pedir foto o reseña", for:"Entregado"}
 ];
+const WA_AP_OPTS = [
+  {k:"como", t:"Cómo funciona el apartado", s:"20% de adelanto y 15 días"},
+  {k:"apartado", t:"Confirmación de apartado", s:"Adelanto, saldo y fecha límite"},
+  {k:"recordatorio", t:"Recordatorio de saldo", s:"Saldo pendiente y días que quedan"},
+  {k:"completado", t:"Apartado completado", s:"Pago completo, listo para envío"}
+];
+function waOptsFor(o){
+  const ap = !!(o.apartado || o.estado==="Apartado" || pagosOf(o).length);
+  const opts = [];
+  if(ap){
+    if(isApartado(o) || o.estado==="Apartado"){
+      if(!pagadoTotal(o)) opts.push(WA_AP_OPTS[0]);
+      opts.push(WA_AP_OPTS[1], WA_AP_OPTS[2]);
+    }
+    if(isPaidFull(o) || (o.apartado && SOLD_STATES.includes(o.estado))) opts.push(WA_AP_OPTS[3]);
+  }
+  WA_OPTS.forEach(w=>{
+    if(ap && (w.k==="resumen" || w.k==="pagado") && (isApartado(o) || (o.apartado && w.k==="pagado"))) return;
+    if(isApartado(o) && (w.k==="enviado"||w.k==="entregado")) return;
+    opts.push(w);
+  });
+  return opts;
+}
+function suggestWa(o){
+  if(isApartado(o) || o.estado==="Apartado"){
+    if(!pagadoTotal(o)) return "como";
+    const d=daysLeft(o);
+    if(d!=null && d<=3) return "recordatorio";
+    return "apartado";
+  }
+  if(o.apartado && o.estado==="Pagado") return "completado";
+  return {Nuevo:"resumen",Pagado:"pagado",Empacado:"pagado",Enviado:"enviado",Entregado:"entregado"}[o.estado];
+}
 const WA_SVG = `<svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.2c0-.1-.2-.2-.4-.3z"/></svg>`;
 
 /* ---------- navigation ---------- */
@@ -417,7 +551,24 @@ function renderHome(){
   $("#sDue").textContent = money(sum(due)); $("#sDueN").textContent = due.length+(due.length===1?" pedido nuevo":" pedidos nuevos");
   const pend = orders.filter(o=>o.estado==="Pagado"||o.estado==="Empacado").sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||""));
   $("#sShip").textContent = pend.length;
-  $("#stsGrid").innerHTML = [...STATES,"Cancelado"].map(s=>{ const n=orders.filter(o=>o.estado===s).length;
+  const aps = orders.filter(isApartado).sort((a,b)=>{
+    const da=daysLeft(a), db=daysLeft(b);
+    const ra=da==null?99:da, rb=db==null?99:db;
+    return ra-rb || (a.fecha||"").localeCompare(b.fecha||"");
+  });
+  const apSoon=aps.filter(o=>{ const d=daysLeft(o); return d!=null && d>=0 && d<=3; }).length;
+  const apLate=aps.filter(o=>{ const d=daysLeft(o); return d!=null && d<0; }).length;
+  $("#sAp").textContent = aps.length;
+  $("#sApN").textContent = aps.length===1?"activo":"activos";
+  $("#sApDue").textContent = money(aps.reduce((a,o)=>a+saldo(o),0));
+  { const bits=[]; if(apLate) bits.push(apLate+(apLate===1?" vencido":" vencidos")); if(apSoon) bits.push(apSoon+" por vencer"); $("#sApDueN").textContent = bits.length?bits.join(" · "):"por cobrar"; }
+  let alert="";
+  if(apLate) alert += `<div class="banner late">⚠️ ${apLate} apartado${apLate===1?"":"s"} vencido${apLate===1?"":"s"}. Dale seguimiento hoy.</div>`;
+  if(apSoon) alert += `<div class="banner">⏳ ${apSoon} apartado${apSoon===1?"":"s"} vence${apSoon===1?"":"n"} en 3 días o menos.</div>`;
+  $("#apAlert").innerHTML = alert;
+  $("#apList").innerHTML = aps.length ? aps.map(orderCard).join("") : `<div class="card empty"><div class="e">⏳</div>No hay apartados activos</div>`;
+  const filters = ["Nuevo","Apartado","Pagado","Empacado","Enviado","Entregado","Cancelado"];
+  $("#stsGrid").innerHTML = filters.map(s=>{ const n=orders.filter(o=>o.estado===s).length;
     return `<button class="st" data-filter="${s}"><div class="n" style="color:${ST[s].c}">${n}</div><div class="t">${ST[s].ic} ${s}</div></button>`; }).join("");
   $("#pendList").innerHTML = pend.length ? pend.map(orderCard).join("") : `<div class="card empty"><div class="e">🎉</div>No hay pedidos pendientes de enviar</div>`;
   const days = meta.lastBackup ? (Date.now()-meta.lastBackup)/864e5 : Infinity;
@@ -430,17 +581,28 @@ document.addEventListener("click", e=>{ const b=e.target.closest("[data-filter]"
 function orderCard(o){
   const c = calc(o), i = STATES.indexOf(o.estado), next = i>=0 && i<STATES.length-1 ? STATES[i+1] : null;
   const its = o.items.map(it=>`${it.q}× ${esc(pname(it))}`).join(" · ");
-  return `<div class="order" data-open="${o.id}">
+  const ap = isApartado(o);
+  const vl = ap ? venceLabel(o) : null;
+  const cls = ap ? (vl.cls==="late"?"late":vl.cls==="soon"?"soon":"") : "";
+  let act = "";
+  if(ap){
+    act = `<div class="act"><button class="btn sm pri flex1" data-abono="${o.id}">💳 Registrar abono</button><button class="btn sm wa" data-wa="${o.id}" aria-label="WhatsApp">${WA_SVG}</button></div>`;
+  } else if(next){
+    act = `<div class="act"><button class="btn sm pri flex1" data-next="${o.id}">${ST[next].ic} Marcar ${next}</button><button class="btn sm wa" data-wa="${o.id}" aria-label="WhatsApp">${WA_SVG}</button></div>`;
+  }
+  const extra = ap ? `<div class="due ${vl.cls}">${esc(vl.txt)} · pagado ${money(pagadoTotal(o))} · saldo ${money(saldo(o))}</div>` : "";
+  return `<div class="order ${cls}" data-open="${o.id}">
     <div class="top"><div><div class="nm">${esc(o.cliente||"Sin nombre")}</div><div class="meta">#${o.num} · ${fmtDate(o.fecha)} · ${fmtPhone(o.tel)}</div></div>
-    <div style="text-align:right"><div class="tot">${money(c.total)}</div><div style="margin-top:4px">${pill(o.estado)}</div></div></div>
+    <div style="text-align:right"><div class="tot">${ap?money(saldo(o)):money(c.total)}</div><div style="margin-top:4px">${pill(o.estado)}</div></div></div>
     <div class="its">${its||"<i>Sin productos</i>"}</div>
-    ${next?`<div class="act"><button class="btn sm pri flex1" data-next="${o.id}">${ST[next].ic} Marcar ${next}</button><button class="btn sm wa" data-wa="${o.id}" aria-label="WhatsApp">${WA_SVG}</button></div>`:""}
+    ${extra}${act}
   </div>`;
 }
 function renderList(){
+  const tabNames = ["Activos","Apartado","Todos","Nuevo","Pagado","Empacado","Enviado","Entregado","Cancelado"];
   const counts = {Todos:orders.length, Activos:orders.filter(o=>!["Entregado","Cancelado"].includes(o.estado)).length};
-  [...STATES,"Cancelado"].forEach(s=>counts[s]=orders.filter(o=>o.estado===s).length);
-  $("#tabs").innerHTML = ["Activos","Todos",...STATES,"Cancelado"].map(s=>`<button class="tab ${filter===s?"on":""}" data-tab="${s}">${s}<b>${counts[s]}</b></button>`).join("");
+  tabNames.forEach(s=>{ if(s!=="Todos"&&s!=="Activos") counts[s]=orders.filter(o=>o.estado===s).length; });
+  $("#tabs").innerHTML = tabNames.map(s=>`<button class="tab ${filter===s?"on":""}" data-tab="${s}">${s==="Apartado"?"Apartados":s}<b>${counts[s]}</b></button>`).join("");
   const q = $("#q").value.trim().toLowerCase(), qd = q.replace(/\D/g,"");
   let list = orders.filter(o => filter==="Todos" ? true : filter==="Activos" ? !["Entregado","Cancelado"].includes(o.estado) : o.estado===filter);
   if(q) list = list.filter(o => (o.cliente||"").toLowerCase().includes(q) || (qd && ((o.tel||"").includes(qd) || String(o.num).includes(qd))) || (o.guia||"").toLowerCase().includes(q));
@@ -452,6 +614,7 @@ $("#q").addEventListener("input", renderList);
 document.addEventListener("click", e=>{
   const t=e.target.closest("[data-tab]"); if(t){ filter=t.dataset.tab; renderList(); return; }
   const n=e.target.closest("[data-next]"); if(n){ e.stopPropagation(); advance(n.dataset.next); return; }
+  const ab=e.target.closest("[data-abono]"); if(ab){ e.stopPropagation(); openAbonoSheet(ab.dataset.abono); return; }
   const w=e.target.closest("[data-wa]"); if(w){ e.stopPropagation(); openWaSheet(w.dataset.wa); return; }
   const o=e.target.closest("[data-open]"); if(o){ detailId=o.dataset.open; go("detail"); }
 });
@@ -459,6 +622,10 @@ document.addEventListener("click", e=>{
 /* ---------- status ---------- */
 function setStatus(id, s, silent){
   const o = getO(id); if(!o || o.estado===s) return;
+  if(s==="Nuevo" && o.apartado && !isPaidFull(o)) s = "Apartado";
+  if(s==="Pagado" && (o.estado==="Apartado"||isApartado(o)) && !isPaidFull(o)){
+    toast("Todavía falta el saldo del apartado"); openAbonoSheet(id); return;
+  }
   if(s==="Enviado" && !o.guia && o.entrega!=="persona"){
     const g = prompt("Número de guía de Correos (opcional):", "");
     if(g===null) return;
@@ -466,10 +633,10 @@ function setStatus(id, s, silent){
   }
   o.estado = s; o.hist = o.hist||[]; o.hist.push({s, ts:Date.now()}); o.upd = Date.now();
   persistOrders();
-  if(!silent) toast(ST[s].ic+" Pedido #"+o.num+" → "+s);
+  if(!silent) toast((ST[s]||{}).ic+" Pedido #"+o.num+" → "+s);
   render();
-  const map = {Nuevo:"resumen",Pagado:"pagado",Enviado:"enviado",Entregado:"entregado"};
-  if(map[s] && !silent && view!=="detail") setTimeout(()=>openWaSheet(id, map[s]), 250);
+  const sug = suggestWa(o);
+  if(sug && !silent && view!=="detail") setTimeout(()=>openWaSheet(id, sug), 250);
 }
 function advance(id){ const o=getO(id); const i=STATES.indexOf(o.estado); if(i>=0 && i<STATES.length-1) setStatus(id, STATES[i+1]); }
 
@@ -478,20 +645,45 @@ function renderDetail(){
   const o = getO(detailId); const el = $("#v-detail");
   if(!o){ el.innerHTML = `<div class="card empty">Pedido no encontrado</div>`; return; }
   const c = calc(o), i = STATES.indexOf(o.estado), next = i>=0 && i<STATES.length-1 ? STATES[i+1] : null;
-  const sugg = {Nuevo:"resumen",Pagado:"pagado",Empacado:"pagado",Enviado:"enviado",Entregado:"entregado"}[o.estado];
+  const sugg = suggestWa(o);
   const dest = o.entrega==="persona" ? "En persona 🤝" : o.entrega==="sucursal" ? ("Sucursal: "+[o.sucursal,o.provincia].filter(Boolean).join(", ")) : [o.direccion,o.provincia].filter(Boolean).join(", ");
+  const ap = isApartado(o) || !!(o.apartado && pagosOf(o).length);
+  const vl = venceLabel(o);
+  const waBtns = waOptsFor(o).map(w=>`<a class="wa-btn ${w.k===sugg?"sug":""}" href="${esc(waLink(o.tel, MSG[w.k](o)))}" target="_blank" rel="noopener" data-wak="${w.k}"><span class="ic">${WA_SVG}</span><span><b>${w.t}</b><small>${w.s}</small></span>${w.k===sugg?'<span class="tag">Sugerido</span>':""}</a>`).join("");
+  let statusHtml = "";
+  if(o.estado==="Cancelado"){
+    statusHtml = `<div class="hint" style="margin-top:12px">Este pedido está cancelado.</div><button class="btn full" style="margin-top:10px" data-set="Nuevo">↩️ Reactivar pedido</button>`;
+  } else if(isApartado(o)){
+    statusHtml = `<div class="due ${vl.cls}" style="margin-top:12px">${esc(vl.txt)}</div>
+    <div class="hint" style="margin-top:8px">Cuando el saldo esté completo, el pedido pasa a Pagado para preparar el envío.</div>
+    ${isPaidFull(o)?`<button class="bigbtn" style="margin:8px 0 10px" data-set="Pagado">${ST.Pagado.ic} Marcar como Pagado</button>`:""}`;
+  } else {
+    statusHtml = `<div class="pipe" style="margin-top:16px">${STATES.map((s,k)=>`<button class="ps ${k<=i?"done":""} ${k===i?"cur":""}" data-set="${s}"><i>${k<i?"✓":ST[s].ic}</i>${s}</button>`).join("")}</div>
+    ${next?`<button class="bigbtn" style="margin:4px 0 10px" data-set="${next}">${ST[next].ic} Marcar como ${next}</button>`:`<div class="hint" style="text-align:center;margin-bottom:8px">🎉 Pedido completado</div>`}
+    <div class="hint" style="text-align:center">Tocá un paso para corregir el estado.</div>`;
+  }
+  const pagoRows = pagosOf(o).slice().sort((a,b)=>(a.fecha||"").localeCompare(b.fecha||"")||((a.ts||0)-(b.ts||0))).map(p=>`<div class="kv"><span>${fmtDate(p.fecha)} · ${p.tipo==="adelanto"?"Adelanto":"Abono"}</span><b>${money(p.monto)} ${o.estado==="Cancelado"||SOLD_STATES.includes(o.estado)?"":`<button class="btn sm ghost" data-delpago="${p.id}" aria-label="Quitar abono" style="min-height:32px;padding:4px 8px;margin-left:6px">✕</button>`}</b></div>`).join("");
+  const apCard = ap ? `<div class="card" id="apCard"><b style="font-size:17px">⏳ Apartado</b>
+    <div class="due ${vl.cls}">${esc(vl.txt)}</div>
+    <div class="sumrow" style="margin-top:8px"><span>Total del pedido</span><b>${money(c.total)}</b></div>
+    <div class="sumrow"><span>Pagado</span><b>${money(pagadoTotal(o))}</b></div>
+    <div class="sumrow tot"><span>Saldo pendiente</span><span>${money(saldo(o))}</span></div>
+    ${pagoRows||`<div class="hint">Todavía no hay pagos registrados.</div>`}
+    ${(!isPaidFull(o) && o.estado!=="Cancelado")?`<div style="margin-top:12px"><label class="lb">Registrar abono</label>
+      <div class="row"><div class="flex1"><input class="in" id="abF" type="date" value="${todayStr()}"></div>
+      <div class="flex1"><input class="in" id="abM" inputmode="numeric" placeholder="Monto (₡)"></div></div>
+      <button class="btn pri full" id="abGo" style="margin-top:10px">💳 Registrar abono</button></div>`:""}
+  </div>` : "";
   el.innerHTML = `
   <div class="card">
     <div class="top" style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
       <div><div style="font-size:21px;font-weight:800">${esc(o.cliente||"Sin nombre")}</div>
       <div class="mini">+506 ${fmtPhone(o.tel)}</div></div>${pill(o.estado)}</div>
-    ${o.estado==="Cancelado" ? `<div class="hint" style="margin-top:12px">Este pedido está cancelado.</div><button class="btn full" style="margin-top:10px" data-set="Nuevo">↩️ Reactivar pedido</button>` : `
-    <div class="pipe" style="margin-top:16px">${STATES.map((s,k)=>`<button class="ps ${k<=i?"done":""} ${k===i?"cur":""}" data-set="${s}"><i>${k<i?"✓":ST[s].ic}</i>${s}</button>`).join("")}</div>
-    ${next?`<button class="bigbtn" style="margin:4px 0 10px" data-set="${next}">${ST[next].ic} Marcar como ${next}</button>`:`<div class="hint" style="text-align:center;margin-bottom:8px">🎉 Pedido completado</div>`}
-    <div class="hint" style="text-align:center">Tocá un paso para corregir el estado.</div>`}
+    ${statusHtml}
   </div>
+  ${apCard}
   <div class="card"><b style="font-size:17px">💬 Mensajes de WhatsApp</b><div class="wa-list" style="margin-top:10px">
-    ${WA_OPTS.map(w=>`<a class="wa-btn ${w.k===sugg?"sug":""}" href="${esc(waLink(o.tel, MSG[w.k](o)))}" target="_blank" rel="noopener" data-wak="${w.k}"><span class="ic">${WA_SVG}</span><span><b>${w.t}</b><small>${w.s}</small></span>${w.k===sugg?'<span class="tag">Sugerido</span>':""}</a>`).join("")}
+    ${waBtns}
   </div></div>
   <div class="card"><b style="font-size:17px">🧸 Productos</b>
     ${o.items.map(it=>`<div class="kv"><span style="color:var(--ink)">${it.q} × ${esc(pname(it))}</span><b>${money(it.p*it.q)}</b></div>`).join("")}
@@ -511,9 +703,12 @@ function renderDetail(){
   <div class="row" style="margin-bottom:12px"><button class="btn flex1" id="dEdit">✏️ Editar</button><button class="btn flex1" id="dDup">📄 Duplicar</button></div>
   ${o.estado!=="Cancelado"?`<button class="btn bad full" data-set="Cancelado">✖️ Cancelar pedido</button>`:""}`;
   $("#dEdit").onclick = ()=>openForm(o);
-  $("#dDup").onclick = ()=>{ const copy = JSON.parse(JSON.stringify(o)); delete copy.id; copy.guia=""; openForm(null, copy); };
+  $("#dDup").onclick = ()=>{ const copy = JSON.parse(JSON.stringify(o)); delete copy.id; copy.guia=""; copy.pagos=[]; copy.apartado=false; openForm(null, copy); };
+  const abGo=$("#abGo"); if(abGo) abGo.onclick=()=>addPago(o.id, $("#abF").value, num($("#abM").value));
 }
 $("#v-detail").addEventListener("click", e=>{
+  const del = e.target.closest("[data-delpago]");
+  if(del){ e.stopPropagation(); delPago(detailId, del.dataset.delpago); return; }
   const b = e.target.closest("[data-set]"); if(!b) return;
   const s = b.dataset.set, o = getO(detailId);
   if(s==="Cancelado" && !confirm("¿Cancelar el pedido #"+o.num+"?")) return;
@@ -527,26 +722,72 @@ function closeSheet(){ $("#sheet").classList.remove("on"); $("#sheetBg").classLi
 $("#sheetBg").onclick = closeSheet;
 function openWaSheet(id, sug){
   const o = getO(id); if(!o) return;
-  sug = sug || {Nuevo:"resumen",Pagado:"pagado",Empacado:"pagado",Enviado:"enviado",Entregado:"entregado"}[o.estado];
+  sug = sug || suggestWa(o);
   openSheet(`<h3>💬 WhatsApp a ${esc(firstName(o.cliente)||"cliente")}<button class="btn sm ghost" data-close>Cerrar</button></h3>
-    <div class="wa-list">${WA_OPTS.map(w=>`<a class="wa-btn ${w.k===sug?"sug":""}" href="${esc(waLink(o.tel, MSG[w.k](o)))}" target="_blank" rel="noopener" data-wak="${w.k}"><span class="ic">${WA_SVG}</span><span><b>${w.t}</b><small>${w.s}</small></span>${w.k===sug?'<span class="tag">Sugerido</span>':""}</a>`).join("")}</div>`);
+    <div class="wa-list">${waOptsFor(o).map(w=>`<a class="wa-btn ${w.k===sug?"sug":""}" href="${esc(waLink(o.tel, MSG[w.k](o)))}" target="_blank" rel="noopener" data-wak="${w.k}"><span class="ic">${WA_SVG}</span><span><b>${w.t}</b><small>${w.s}</small></span>${w.k===sug?'<span class="tag">Sugerido</span>':""}</a>`).join("")}</div>`);
 }
 $("#sheet").addEventListener("click", e=>{ if(e.target.closest("[data-close]")) closeSheet(); if(e.target.closest(".wa-btn")) setTimeout(closeSheet,300); });
+
+function addPago(id, fecha, monto, tipo){
+  const o=getO(id); if(!o) return;
+  monto=Math.round(+monto||0);
+  if(monto<=0){ toast("Escribí el monto del abono"); return; }
+  o.pagos = pagosOf(o).slice();
+  const isFirst=!o.pagos.length;
+  o.pagos.push({id:uid(), tipo:tipo||(isFirst?"adelanto":"abono"), fecha:fecha||todayStr(), monto, ts:Date.now()});
+  o.apartado = true; o.upd = Date.now();
+  if(o.estado==="Nuevo") { o.estado="Apartado"; o.hist=o.hist||[]; o.hist.push({s:"Apartado",ts:Date.now()}); }
+  persistOrders();
+  if(isPaidFull(o) && (o.estado==="Apartado"||o.estado==="Nuevo")){
+    setStatus(id, "Pagado");
+    if(view==="detail") go("detail",{noPush:true,keepScroll:true});
+  } else {
+    toast("✅ "+(isFirst?"Adelanto":"Abono")+" de "+money(monto)+" registrado");
+    render();
+  }
+}
+function delPago(id, pid){
+  const o=getO(id); if(!o) return;
+  if(!confirm("¿Quitar este pago?")) return;
+  o.pagos = pagosOf(o).filter(p=>p.id!==pid); o.upd=Date.now();
+  if(o.apartado && o.estado==="Pagado" && !isPaidFull(o)){
+    o.estado="Apartado"; o.hist=o.hist||[]; o.hist.push({s:"Apartado",ts:Date.now()});
+  }
+  persistOrders(); toast("Pago eliminado"); render();
+}
+function openAbonoSheet(id){
+  const o=getO(id); if(!o) return;
+  const rest=saldo(o);
+  openSheet(`<h3>Registrar abono<button class="btn sm ghost" data-close>Cerrar</button></h3>
+    <div class="hint">Pedido #${o.num} · ${esc(o.cliente||"")} · Saldo ${money(rest)}</div>
+    <label class="lb">Fecha</label><input class="in" id="abF" type="date" value="${todayStr()}">
+    <label class="lb">Monto (₡)</label><input class="in" id="abM" inputmode="numeric" placeholder="${rest}">
+    <button class="bigbtn" id="abGo" style="margin-top:16px">💾 Registrar</button>`);
+  $("#abGo").onclick=()=>{ addPago(id, $("#abF").value, num($("#abM").value)); closeSheet(); };
+}
 
 /* ---------- form ---------- */
 let F = null; // working order
 function openForm(o, preset){
   editing = o;
-  F = o ? JSON.parse(JSON.stringify(o)) : Object.assign({cliente:"",tel:"",fecha:todayStr(),items:[],shipManual:false,ship:SHOP.ship,desc:0,pago:"SINPE",entrega:"domicilio",provincia:"",direccion:"",sucursal:"",guia:"",notas:""}, preset||{}, preset?{fecha:todayStr()}:{});
+  F = o ? JSON.parse(JSON.stringify(o)) : Object.assign({cliente:"",tel:"",fecha:todayStr(),items:[],shipManual:false,ship:SHOP.ship,desc:0,pago:"SINPE",entrega:"domicilio",provincia:"",direccion:"",sucursal:"",guia:"",notas:"",apartado:false,pagos:[]}, preset||{}, preset?{fecha:todayStr()}:{});
+  if(!Array.isArray(F.pagos)) F.pagos=[];
   $("#fName").value=F.cliente; $("#fTel").value=fmtPhone(F.tel); $("#fDate").value=F.fecha;
   $("#fShipMan").checked=!!F.shipManual; $("#fShip").value=F.shipManual?F.ship:""; $("#fDisc").value=F.desc||"";
   $("#fProv").value=F.provincia||""; $("#fAddr").value=F.direccion||""; $("#fSuc").value=F.sucursal||""; $("#fGuia").value=F.guia||""; $("#fNotes").value=F.notas||"";
+  const isAp = !!(F.apartado || F.estado==="Apartado");
+  $("#fApartado").checked = isAp;
+  const adel = F.pagos.find(p=>p.tipo==="adelanto") || F.pagos[0];
+  $("#fAdelFecha").value = (adel&&adel.fecha) || todayStr();
+  $("#fAdelMonto").value = adel ? adel.monto : "";
+  renderAp.lastSug = adel ? +adel.monto||0 : 0;
   segSet("#fPay",F.pago); segSet("#fDel",F.entrega);
   $("#eTel").style.display="none"; $("#eItems").style.display="none";
   $("#delBtn").style.display = o ? "flex":"none";
   $("#saveBtn").textContent = o ? "💾 Guardar cambios" : "💾 Guardar pedido";
   stack.push(view); view="form"; go("form",{noPush:true});
   renderItems();
+  renderAp();
 }
 function segSet(sel,v){ document.querySelectorAll(sel+" button").forEach(b=>b.classList.toggle("on", b.dataset.v===v)); if(sel==="#fDel") delUI(); }
 function segInit(sel,key){ document.querySelectorAll(sel+" button").forEach(b=>b.onclick=()=>{ F[key]=b.dataset.v; segSet(sel,b.dataset.v); renderTotals(); }); }
@@ -568,6 +809,20 @@ $("#fItems").addEventListener("click", e=>{
   if(r){ F.items.splice(+r.dataset.rm,1); renderItems(); }
 });
 $("#fItems").addEventListener("input", e=>{ const p=e.target.closest("[data-price]"); if(p){ F.items[+p.dataset.price].p = num(p.value); renderTotals(); } });
+function renderAp(){
+  if(!F) return;
+  const on = $("#fApartado").checked;
+  $("#fApBox").style.display = on ? "block" : "none";
+  if(!on) return;
+  const sug = adelantoSugerido(F);
+  $("#fApSug").textContent = money(sug);
+  const mon = $("#fAdelMonto");
+  if(!mon.value || num(mon.value)===(renderAp.lastSug||0)) mon.value = sug||"";
+  renderAp.lastSug = sug;
+  const f = $("#fAdelFecha").value;
+  $("#fApVence").innerHTML = f ? `Queda apartado hasta el <b>${fmtDate(addDays(f,AP_DIAS))}</b> (15 días).` : "La fecha límite se cuenta desde el día del adelanto.";
+}
+renderAp.lastSug = 0;
 function renderTotals(){
   if(!F) return;
   F.shipManual = $("#fShipMan").checked; F.ship = F.shipManual ? num($("#fShip").value) : SHOP.ship; F.desc = num($("#fDisc").value);
@@ -576,8 +831,12 @@ function renderTotals(){
   $("#fSub").textContent = money(c.sub);
   $("#fShipLbl").innerHTML = c.ship===0 ? `<span class="free">${F.entrega==="persona"&&!F.shipManual?"Sin envío":"Gratis 🎉"}</span>` : money(c.ship);
   $("#fTot").textContent = money(c.total);
+  renderAp();
 }
 ["#fShipMan","#fShip","#fDisc"].forEach(s=>$(s).addEventListener("input",renderTotals));
+$("#fApartado").addEventListener("change", ()=>{ if($("#fApartado").checked){ if(!$("#fAdelFecha").value) $("#fAdelFecha").value=todayStr(); if(!$("#fAdelMonto").value && F){ const s=adelantoSugerido(F); $("#fAdelMonto").value=s||""; renderAp.lastSug=s; } } renderAp(); });
+$("#fAdelFecha").addEventListener("input", renderAp);
+$("#fAdelMonto").addEventListener("input", ()=>{ renderAp.lastSug = -1; });
 $("#fShipMan").addEventListener("change", ()=>{ if($("#fShipMan").checked && !$("#fShip").value) $("#fShip").value = calc(Object.assign({},F,{shipManual:false})).ship; renderTotals(); });
 $("#fTel").addEventListener("input", e=>{ const d=cleanPhone(e.target.value); if(d.length<=8) e.target.value = fmtPhone(d)||d; $("#eTel").style.display="none"; });
 $("#addProdBtn").onclick = openPicker;
@@ -590,11 +849,34 @@ $("#saveBtn").onclick = ()=>{
   if(!F.items.length){ $("#eItems").style.display="block"; ok=false; }
   if(!ok){ toast("Revisá los campos en rojo"); window.scrollTo({top:0,behavior:"smooth"}); return; }
   if(!F.cliente) F.cliente = "Cliente "+fmtPhone(F.tel);
-  if(editing){ Object.assign(editing, F, {upd:Date.now()}); persistOrders(); toast("✅ Cambios guardados"); detailId=editing.id; }
-  else {
+  const wantAp = $("#fApartado").checked;
+  F.apartado = wantAp;
+  F.pagos = Array.isArray(F.pagos)?F.pagos.slice():[];
+  if(wantAp){
+    const am = num($("#fAdelMonto").value), af = $("#fAdelFecha").value || todayStr();
+    if(am>0){
+      const i = F.pagos.findIndex(p=>p.tipo==="adelanto");
+      const adel = {id:i>=0?F.pagos[i].id:uid(), tipo:"adelanto", fecha:af, monto:am, ts:(i>=0&&F.pagos[i].ts)||Date.now()};
+      if(i>=0) F.pagos[i]=adel; else F.pagos.unshift(adel);
+    }
+  }
+  function nextEstado(prev){
+    if(wantAp && isPaidFull(F) && (!prev || prev==="Nuevo" || prev==="Apartado")) return "Pagado";
+    if(wantAp && (!prev || prev==="Nuevo" || prev==="Apartado")) return "Apartado";
+    if(!wantAp && prev==="Apartado") return "Nuevo";
+    return prev || "Nuevo";
+  }
+  if(editing){
+    const prev = editing.estado;
+    const estado = nextEstado(prev);
+    Object.assign(editing, F, {estado, upd:Date.now()});
+    if(estado!==prev){ editing.hist = editing.hist||[]; editing.hist.push({s:estado, ts:Date.now()}); }
+    persistOrders(); toast("✅ Cambios guardados"); detailId=editing.id;
+  } else {
     meta.seq = Math.max(meta.seq||0, ...orders.map(o=>+o.num||0)) + 1; save(K.meta, meta);
-    const o = Object.assign({}, F, {id:uid(), num:meta.seq, estado:"Nuevo", hist:[{s:"Nuevo",ts:Date.now()}], creado:Date.now(), upd:Date.now()});
-    orders.push(o); persistOrders(); detailId=o.id; toast("✅ Pedido #"+o.num+" creado");
+    const estado = nextEstado(null);
+    const o = Object.assign({}, F, {id:uid(), num:meta.seq, estado, hist:[{s:estado,ts:Date.now()}], creado:Date.now(), upd:Date.now()});
+    orders.push(o); persistOrders(); detailId=o.id; toast(estado==="Apartado"?"✅ Apartado #"+o.num+" creado":"✅ Pedido #"+o.num+" creado");
   }
   stack = stack.filter(v=>v!=="form" && v!=="detail"); view = stack.pop()||"home"; stack.push(view);
   go("detail",{noPush:true}); editing=null;
@@ -703,8 +985,8 @@ async function exportJson(){
 }
 function csvCell(v){ v = String(v==null?"":v); return /[",;\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
 async function exportCsv(){
-  const head = ["Pedido","Fecha","Estado","Cliente","Teléfono","Productos","Unidades","Subtotal","Envío","Descuento","Total","Pago","Entrega","Provincia","Dirección","Sucursal","Guía Correos","Notas"];
-  const rows = orders.slice().sort((a,b)=>a.num-b.num).map(o=>{ const c=calc(o); return [o.num,o.fecha,o.estado,o.cliente,"+506 "+fmtPhone(o.tel),o.items.map(it=>it.q+" x "+pname(it)+" @ "+it.p).join(" | "),o.items.reduce((a,it)=>a+ +it.q,0),c.sub,c.ship,c.disc,c.total,o.pago,o.entrega,o.provincia,o.direccion,o.sucursal,o.guia,o.notas]; });
+  const head = ["Pedido","Fecha","Estado","Cliente","Teléfono","Productos","Unidades","Subtotal","Envío","Descuento","Total","Pagado","Saldo","Vence","Pago","Entrega","Provincia","Dirección","Sucursal","Guía Correos","Notas"];
+  const rows = orders.slice().sort((a,b)=>a.num-b.num).map(o=>{ const c=calc(o); return [o.num,o.fecha,o.estado,o.cliente,"+506 "+fmtPhone(o.tel),o.items.map(it=>it.q+" x "+pname(it)+" @ "+it.p).join(" | "),o.items.reduce((a,it)=>a+ +it.q,0),c.sub,c.ship,c.disc,c.total,pagadoTotal(o),saldo(o),venceFecha(o),o.pago,o.entrega,o.provincia,o.direccion,o.sucursal,o.guia,o.notas]; });
   const csv = "\ufeff"+[head,...rows].map(r=>r.map(csvCell).join(",")).join("\r\n");
   await deliverFile("giftify-pedidos_"+stamp()+".csv", csv, "text/csv");
   toast("📊 CSV exportado");
